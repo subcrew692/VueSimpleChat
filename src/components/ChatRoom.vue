@@ -14,7 +14,7 @@
           <div class="roomHead__button minimize"></div>
           <div class="roomHead__button zoom"></div>
         </div>
-        <img src="https://lorempixel.com/50/50/" class="roomHead__img" draggable="false">
+        <img :src="userPic" class="roomHead__img" draggable="false">
         <div class="roomHead__title">Test Room</div>
       </div>
       <!-- 區塊: body -->
@@ -24,7 +24,7 @@
           <!-- other people -->
           <template v-if="item.userName != userName">
             <div class="messageBox" :key="item.id">
-              <img src="https://lorempixel.com/40/40/" class="messageBox__user" draggable="false">
+              <img src="../assets/user.png" class="messageBox__user" draggable="false">
               <div class="messageBox__content">
                 <div class="messageBox__name">{{item.userName}}</div>
                 <div v-if="item.type == 'text'" class="messageBox__message">
@@ -32,8 +32,13 @@
                   <div class="messageBox__readMore" @click="readMore($event)">顯示更多</div>
                 </div>
                 <div v-if="item.type == 'image'" class="messageBox__image"><img :src="item.message"></div>
+                <div class="messageBox__delete">
+                  <span @click="downloadImage()" v-if="item.type == 'image'">下載</span>
               </div>
-              <div class="messageBox__time">{{item.timeStamp}}</div>
+              </div>
+              <div class="messageBox__time">{{item.timeStamp}}
+              
+              </div>
             </div>
           </template>
           <!-- 區塊：self -->
@@ -44,13 +49,18 @@
               :key="item.id">
               <div class="messageBox__time">{{item.timeStamp}}</div>
               <div class="messageBox__content">
-                <div v-if="item.type == 'text'" class="messageBox__message">
-                  <div class="messageBox__text">{{item.message}}</div>
+                <div v-if="item.type == 'text'" class="messageBox__message"
+                @click="currentMsgID = currentMsgID === item.id ? '' : item.id">
+                  <div class="messageBox__text" :id="item.id">{{item.message}}</div>
                 </div>
-                <div v-if="item.type == 'image'" class="messageBox__image"><img :src="item.message"></div>
+                <div v-if="item.type == 'image'" class="messageBox__image"
+                @click="currentMsgID = currentMsgID === item.id ? '' : item.id"><img :src="item.message"></div>
               </div>
-              <div v-if="hoverMessageId === item.id" class="messageBox__delete">
-                <span @click="deleteMessage(hoverMessageId)">刪除</span>
+              <div class="messageBox__delete">
+                  <span @click="downloadImage()" v-if="item.type == 'image'"
+                  v-show="currentMsgID === item.id" >下載</span>
+                  <span @click="deleteMessage(hoverMessageId)"
+                  v-show="currentMsgID === item.id" >刪除</span>
               </div>
             </div>
           </template>
@@ -68,8 +78,12 @@
         <div class="roomBottom__tools">
           <!-- 上傳圖片 -->
           <div class="roomBottom__tools_upload">
-            <input type="file" accept="image/*" @change="sendImage($event)">
-            <img src="../assets/paperclip.png" title="傳送檔案">
+            <input type="file" accept="image/*" @change="sendImage($event, true)">
+            <img src="../assets/paperclip.png" title="傳送檔案">&nbsp;
+          </div>
+          <div class="roomBottom__tools_upload">
+            <input type="file" accept="image/*" @change="sendImage($event, false)">
+            <img src="../assets/user.png" title="更換大頭貼">
           </div>
         </div>
         <div class="roomBottom__input">
@@ -93,12 +107,22 @@
         <footer class="modal__footer"></footer>
       </div>
     </div>
+    <!-- 訊息框 -->
+    <div v-show="messageModalBlock" class="modal">
+      <div class="modal__container">
+        <div class="modal__body">
+          <p>{{modalMessage}}</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 // msgRef = firebase中的資料表/messages/，若沒有的會自動建立
 const msgRef = firebase.database().ref('/messages/');
+const userRef = firebase.storage().ref('/users/');
+const userFileRef = firebase.database().ref('/userProfile/');
 const storageRef = firebase.storage().ref('/images/');
 export default {
   // 指定使用此頁的name
@@ -110,7 +134,12 @@ export default {
       messages: [], // 訊息內容
       userNameSet: false, // 姓名輸入框
       upload: false, // 上傳進度框
-      progress: '' // 上傳進度%數
+      progress: '', // 上傳進度%數
+      currentMsgID: '',
+      messageModalBlock: false,
+      modalMessage: '',
+      userList: null,
+      userPic: ''
     }
   },
   methods: {
@@ -125,6 +154,23 @@ export default {
       if(userName.trim() == '') { return; }
       vm.userName = userName;
       vm.userNameSet = false;
+      // 尋找此user的大頭貼照片
+      var tempName = '';
+      if(vm.userList != null) {
+        console.log('this user has picture');
+        for(var i in vm.userList) {
+          if(userName === i) {
+            const detail = vm.userList[i];
+            for(var j in detail) {
+              if(tempName < j) {
+                tempName = j;
+                vm.userPic = detail[j].pictureURL;
+              }
+            }
+            break;
+          }
+        }
+      }
     },
     /** 取得時間 */
     getTime() {
@@ -162,7 +208,7 @@ export default {
       e.preventDefault();
     },
     /** 傳送圖片 */
-    sendImage(e) {
+    sendImage(e, isMessage) {
       console.log(e);
       const vm = this;
       const userName = document.querySelector('#js-userName');
@@ -176,44 +222,86 @@ export default {
       let progressBar = document.querySelector('#js-progressBar');
       // 上傳資訊設定
       const uploadTask = storageRef.child(fileName).put(file, metadata);
-      // 上傳狀態處理
-      uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
-        /* 上傳進度 */
-        function(snapshot) {
-          let progress = Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          if(progress < 100) {
-            // 開啟進度條
-            vm.upload = true;
-            vm.progress = `${progress}%`;
-            progressBar.setAttribute('style', `width:${progress}%`);
-          }
-        },
-        /* 錯誤處理 */
-        function(error) {
-          msgRef.child('bug/').push({
-            userName: userName.value,
-            type: 'image',
-            message: error.code,
-            timeStamp: vm.getTime()
-          })
-        },
-        /* 上傳結束處理 */
-        function() {
-          var downloadURL = '';
-          uploadTask.snapshot.ref.getDownloadURL().then(function(url) {
-            console.log("File available at", url);
-            downloadURL = url;
-            msgRef.push({
+      const userTask = userRef.child(fileName).put(file, metadata);
+      if(isMessage) {
+        // 上傳狀態處理
+        uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
+          /* 上傳進度 */
+          function(snapshot) {
+            let progress = Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            if(progress < 100) {
+              // 開啟進度條
+              vm.upload = true;
+              vm.progress = `${progress}%`;
+              progressBar.setAttribute('style', `width:${progress}%`);
+            }
+          },
+          /* 錯誤處理 */
+          function(error) {
+            msgRef.child('bug/').push({
               userName: userName.value,
               type: 'image',
-              message: downloadURL,
+              message: error.code,
               timeStamp: vm.getTime()
             })
-          });
-          // 關閉進度條
-          vm.upload = false;
-        }
-      )
+          },
+          /* 上傳結束處理 */
+          function() {
+            var downloadURL = '';
+            uploadTask.snapshot.ref.getDownloadURL().then(function(url) {
+              console.log("File available at", url);
+              downloadURL = url;
+              msgRef.push({
+                userName: userName.value,
+                type: 'image',
+                message: downloadURL,
+                timeStamp: vm.getTime()
+              })
+            });
+            // 關閉進度條
+            vm.upload = false;
+          }
+        )
+      }else {
+        var uploadUserFileRef = firebase.database().ref('/userProfile/' + userName.value + '/');
+        // 上傳狀態處理
+        userTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
+          /* 上傳中，打開訊息框 */
+          function(snapshot) {
+            if(snapshot.bytesTransferred < snapshot.totalBytes) {
+              vm.messageModalBlock = true;
+              vm.modalMessage = '大頭貼上傳中...';
+            }
+          },
+          /* 錯誤處理 */
+          function(error) {
+            msgRef.child('bug/').push({
+              userName: userName.value,
+              type: 'image',
+              message: error.code,
+              timeStamp: vm.getTime()
+            })
+          },
+          /* 上傳結束處理 */
+          function() {
+            var downloadURL = '';
+            var now = new Date();
+            userTask.snapshot.ref.getDownloadURL().then(function(url) {
+              console.log("File available at", url);
+              downloadURL = url;
+              uploadUserFileRef.push({
+                userName: userName.value,
+                type: 'image',
+                pictureURL: downloadURL,
+                timeStamp: now
+              })
+              // 關閉訊息框並重置訊息
+              vm.messageModalBlock = false;
+              vm.modalMessage = '';
+            });
+          }
+        )
+      }
     },
     /** 刪除訊息 */
     deleteMessage(id) {
@@ -226,6 +314,11 @@ export default {
       e.target.previousElementSibling.setAttribute('style', 'max-height: 100%;')
       // 隱藏"顯示更多"按紐
       e.target.setAttribute('style', 'display: none;');
+    },
+    /** 複製訊息 */
+    copyMessage() {
+      document.getElementById(this.currentMsgID).select();
+      document.execCommand("copy");
     }
   },
   // mounted是vue的生命週期之一，代表模板已編譯完成，已經取值準備渲染HTML畫面了
@@ -238,8 +331,15 @@ export default {
         : null
       vm.messages = messageData;
     })
+
+    userFileRef.on('value', function(snapshot) {
+      const val = snapshot.val();
+      if(val !== null && val !== undefined) {
+        vm.userList = val;
+      }
+    })
   },
-  // update是vue的生命週期之一，接再munted後方代表HTML元件渲染完成後
+  // update是vue的生命週期之一，接在munted後方代表HTML元件渲染完成後
   updated() {
     // 判斷內容高度超過300就隱藏起來，把"顯示更多"按紐打開
     const messages = document.querySelectorAll('.messageBox__message');
@@ -375,6 +475,7 @@ export default {
   word-break: break-all;
   /*：與html的<pre></pre>同效果，可以使textarea的換行元素正常顯示 */
   white-space: pre-line;
+  cursor: pointer;
 }
 .messageBox__text {
   padding: 8px 10px 9px 11px;
@@ -392,6 +493,7 @@ export default {
 }
 .messageBox__image {
   margin: 5px 25px 5px 5px;
+  cursor: pointer;
 }
 .messageBox__image img {
   border-radius: 5px;
