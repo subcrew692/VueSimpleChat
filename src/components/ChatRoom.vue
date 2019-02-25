@@ -33,7 +33,7 @@
                 </div>
                 <div v-if="item.type == 'image'" class="messageBox__image"><img :src="item.message"></div>
                 <div class="messageBox__delete">
-                  <span @click="downloadImage()" v-if="item.type == 'image'">下載</span>
+                  <a :href="item.message" :download="item.userName" v-if="item.type == 'image'">下載</a>
               </div>
               </div>
               <div class="messageBox__time">{{item.timeStamp}}
@@ -57,8 +57,7 @@
                 @click="currentMsgID = currentMsgID === item.id ? '' : item.id"><img :src="item.message"></div>
               </div>
               <div class="messageBox__delete">
-                  <span @click="downloadImage()" v-if="item.type == 'image'"
-                  v-show="currentMsgID === item.id" >下載</span>
+                  <a :href="item.message" :download="item.userName" v-if="item.type == 'image'" v-show="currentMsgID === item.id">下載</a>
                   <span @click="deleteMessage(hoverMessageId)"
                   v-show="currentMsgID === item.id" >刪除</span>
               </div>
@@ -302,6 +301,7 @@ export default {
                 userName: userName.value,
                 type: 'image',
                 message: downloadURL,
+                headPicture: vm.userPic,
                 timeStamp: vm.getTime()
               })
             });
@@ -369,6 +369,9 @@ export default {
       this.viewImage = this.userPic; // 將大頭貼src帶入到預覽圖片src
       this.changeHeadPicModal = false; // 關閉大頭貼調整Modal
       this.viewModal = true; // 開啟預覽Modal
+    },
+    downloadImage() {
+
     }
   },
   // mounted是vue的生命週期之一，代表模板已編譯完成，已經取值準備渲染HTML畫面了
