@@ -14,7 +14,7 @@
           <div class="roomHead__button minimize"></div>
           <div class="roomHead__button zoom"></div>
         </div>
-        <img :src="userPic" class="roomHead__img" draggable="false">
+        <img :src="userPic" class="roomHead__img" draggable="false" @click="changeHeadPicModal = true">
         <div class="roomHead__title">Test Room</div>
       </div>
       <!-- 區塊: body -->
@@ -24,7 +24,7 @@
           <!-- other people -->
           <template v-if="item.userName != userName">
             <div class="messageBox" :key="item.id">
-              <img src="../assets/user.png" class="messageBox__user" draggable="false">
+              <img :src="item.headPicture === null ? otherUserPic : item.headPicture" class="messageBox__user" draggable="false">
               <div class="messageBox__content">
                 <div class="messageBox__name">{{item.userName}}</div>
                 <div v-if="item.type == 'text'" class="messageBox__message">
@@ -81,10 +81,12 @@
             <input type="file" accept="image/*" @change="sendImage($event, true)">
             <img src="../assets/paperclip.png" title="傳送檔案">&nbsp;
           </div>
+          <!--
           <div class="roomBottom__tools_upload">
             <input type="file" accept="image/*" @change="sendImage($event, false)">
             <img src="../assets/user.png" title="更換大頭貼">
           </div>
+          -->
         </div>
         <div class="roomBottom__input">
           <!-- 若要再帶入原生js的event(e)到function中，必須使用$event當參數傳入 -->
@@ -107,13 +109,38 @@
         <footer class="modal__footer"></footer>
       </div>
     </div>
-    <!-- 訊息框 -->
+    <!-- 大頭貼上傳訊息框 -->
     <div v-show="messageModalBlock" class="modal">
       <div class="modal__container">
         <div class="modal__body">
-          <p>{{modalMessage}}</p>
+          <p>處理中...</p>
+          <p><img src="../assets/loading-bar.gif"/></p>
         </div>
       </div>
+    </div>
+    <!-- 大頭貼功能框 -->
+    <div v-show="changeHeadPicModal" class="modal">
+      <div class="modal__container">
+        <header class="modal__header">
+          <h2 class="view-title">大頭貼調整</h2>
+        </header>
+        <div class="modal__body">
+          <div class="roomBottom__tools_upload" style="height:38.4px">
+            <div class="button" @click="viewHeadPicture()">檢視</div>
+          </div>
+          <div class="roomBottom__tools_upload" style="height:38.4px">
+            <input type="file" accept="image/*" @change="sendImage($event, false)">
+            <div class="button">更新</div>
+          </div>
+          <div class="roomBottom__tools_upload" style="height:38.4px">
+            <div class="button" @click="changeHeadPicModal = false">離開</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 檢視圖片 -->
+    <div v-show="viewModal" class="modal" @click="viewModal = false;">
+      <img :src="viewImage">
     </div>
   </div>
 </template>
@@ -139,7 +166,11 @@ export default {
       messageModalBlock: false,
       modalMessage: '',
       userList: null,
-      userPic: ''
+      userPic: '',
+      changeHeadPicModal: false,
+      viewModal: false,
+      viewImage: '',
+      otherUserPic: 'https://github.com/subcrew692/VueSimpleChat/blob/master/src/assets/user.png?raw=true'
     }
   },
   methods: {
@@ -154,23 +185,38 @@ export default {
       if(userName.trim() == '') { return; }
       vm.userName = userName;
       vm.userNameSet = false;
+      vm.getUserHeadPicture();
+    },
+    /** 取得user大頭貼 */
+    getUserHeadPicture() {
+      const vm = this;
+      const userName = document.querySelector('#js-userName').value;
       // 尋找此user的大頭貼照片
+      userFileRef.on('value', function(snapshot) {
+        const val = snapshot.val();
+        if(val !== null && val !== undefined) {
+          vm.userList = val;
+        }
+      });
       var tempName = '';
+      var hasPic = false;
       if(vm.userList != null) {
-        console.log('this user has picture');
         for(var i in vm.userList) {
           if(userName === i) {
+            console.log('this user has picture');
             const detail = vm.userList[i];
             for(var j in detail) {
               if(tempName < j) {
                 tempName = j;
                 vm.userPic = detail[j].pictureURL;
+                hasPic = true;
               }
             }
             break;
           }
         }
       }
+      vm.userPic = hasPic ? vm.userPic : vm.otherUserPic;
     },
     /** 取得時間 */
     getTime() {
@@ -201,6 +247,7 @@ export default {
         userName: userName.value,
         type: 'text',
         message: message.value,
+        headPicture: vm.userPic,
         timeStamp: vm.getTime()
       })
       // 清空輸入欄位避免enter產生的空白換行
@@ -269,6 +316,7 @@ export default {
           /* 上傳中，打開訊息框 */
           function(snapshot) {
             if(snapshot.bytesTransferred < snapshot.totalBytes) {
+              vm.changeHeadPicModal = false;
               vm.messageModalBlock = true;
               vm.modalMessage = '大頭貼上傳中...';
             }
@@ -298,6 +346,7 @@ export default {
               // 關閉訊息框並重置訊息
               vm.messageModalBlock = false;
               vm.modalMessage = '';
+              vm.getUserHeadPicture();
             });
           }
         )
@@ -315,10 +364,11 @@ export default {
       // 隱藏"顯示更多"按紐
       e.target.setAttribute('style', 'display: none;');
     },
-    /** 複製訊息 */
-    copyMessage() {
-      document.getElementById(this.currentMsgID).select();
-      document.execCommand("copy");
+    /** 檢視大頭貼 */
+    viewHeadPicture() {
+      this.viewImage = this.userPic; // 將大頭貼src帶入到預覽圖片src
+      this.changeHeadPicModal = false; // 關閉大頭貼調整Modal
+      this.viewModal = true; // 開啟預覽Modal
     }
   },
   // mounted是vue的生命週期之一，代表模板已編譯完成，已經取值準備渲染HTML畫面了
@@ -331,13 +381,13 @@ export default {
         : null
       vm.messages = messageData;
     })
-
+    // 尋找此user的大頭貼照片
     userFileRef.on('value', function(snapshot) {
       const val = snapshot.val();
       if(val !== null && val !== undefined) {
         vm.userList = val;
       }
-    })
+    });
   },
   // update是vue的生命週期之一，接在munted後方代表HTML元件渲染完成後
   updated() {
