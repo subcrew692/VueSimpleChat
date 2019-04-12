@@ -14,7 +14,8 @@
           <div class="roomHead__button minimize"></div>
           <div class="roomHead__button zoom"></div>
         </div>
-        <img :src="userPic" class="roomHead__img" draggable="false" @click="changeHeadPicModal = true">
+        <img :src="userPic" class="roomHead__img" draggable="false" 
+        @click="changeHeadPicModal = true; selectOtherUser = ''; headPictureDes = '大頭貼調整';">
         <div class="roomHead__title">Test Room</div>
       </div>
       <!-- 區塊: body -->
@@ -24,7 +25,8 @@
           <!-- other people -->
           <template v-if="item.userName != userName">
             <div class="messageBox" :key="item.id">
-              <img :src="item.headPicture === null ? otherUserPic : item.headPicture" class="messageBox__user" draggable="false">
+              <img :src="item.headPicture === null ? otherUserPic : item.headPicture" class="messageBox__user" draggable="false" 
+              @click="changeHeadPicModal = true; selectOtherUser = item.id; headPictureDes = item.userName;">
               <div class="messageBox__content">
                 <div class="messageBox__name">{{item.userName}}</div>
                 <div v-if="item.type == 'text'" class="messageBox__message">
@@ -102,8 +104,8 @@
         </header>
         <div class="modal__body">
           <!-- 註解：使用@keydown.enter來偵測keydown enter，觸發時執行method中的saveName() -->
-          <input type="text" id="js-userName" class="userName" maxlength="10" @keydown.enter="saveName()" :value="userName" />
-          <div class="button" @click="saveName()">設定</div>
+          <input type="text" id="js-userName" class="userName" maxlength="10" @keydown.enter="saveName()" :value="userName" /><br/>
+          <div class="button setName" @click="saveName()">設定</div>
         </div>
         <footer class="modal__footer"></footer>
       </div>
@@ -121,13 +123,13 @@
     <div v-show="changeHeadPicModal" class="modal">
       <div class="modal__container">
         <header class="modal__header">
-          <h2 class="view-title">大頭貼調整</h2>
+          <h2 class="view-title">{{headPictureDes}}</h2>
         </header>
         <div class="modal__body">
           <div class="roomBottom__tools_upload" style="height:38.4px">
-            <div class="button" @click="viewHeadPicture()">檢視</div>
+            <div class="button" @click="viewHeadPicture()">檢視大頭貼</div>
           </div>
-          <div class="roomBottom__tools_upload" style="height:38.4px">
+          <div class="roomBottom__tools_upload" style="height:38.4px" v-if="!selectOtherUser">
             <input type="file" accept="image/*" @change="sendImage($event, false)">
             <div class="button">更新</div>
           </div>
@@ -139,7 +141,7 @@
     </div>
     <!-- 檢視圖片 -->
     <div v-show="viewModal" class="modal" @click="viewModal = false;">
-      <img :src="viewImage">
+      <img :src="viewImage" class="headPicPreview">
     </div>
   </div>
 </template>
@@ -169,7 +171,9 @@ export default {
       changeHeadPicModal: false,
       viewModal: false,
       viewImage: '',
-      otherUserPic: 'https://github.com/subcrew692/VueSimpleChat/blob/master/src/assets/user.png?raw=true'
+      otherUserPic: 'https://github.com/subcrew692/VueSimpleChat/blob/master/src/assets/user.png?raw=true',
+      headPictureDes: '大頭貼調整', // 大頭貼敘述
+      selectOtherUser: ''    // 是否點選其他User，若是，則塞入ID以便查詢大頭貼
     }
   },
   methods: {
@@ -369,6 +373,15 @@ export default {
       this.viewImage = this.userPic; // 將大頭貼src帶入到預覽圖片src
       this.changeHeadPicModal = false; // 關閉大頭貼調整Modal
       this.viewModal = true; // 開啟預覽Modal
+      if(this.selectOtherUser !== '') { // 若有值，代表選擇其他User
+        console.log(this.selectOtherUser);
+        for(var i = 0; i < this.messages.length; i++) {
+          if(this.messages[i].id === this.selectOtherUser) {
+            // 以ID找出使用者後代入對應的大頭貼
+            this.viewImage = this.messages[i].headPicture;
+          }
+        }
+      }
     },
     downloadImage() {
 
@@ -688,7 +701,7 @@ export default {
 }
 .modal__body {
   background-color: #fff;
-  padding: 20px 50px;
+  padding: 20px 20px;
   text-align: center;
 }
 .modal__body p {
@@ -718,9 +731,16 @@ export default {
   font-size: 14px;
   color: #FFFFFF;
   background-color: #2B364B;
-  padding: 10px 20px;
+  padding: 5px 10px;
   display: inline-block;
   cursor: pointer;
+}
+.setName {
+  padding: 10px 20px;
+}
+.headPicPreview {
+  height: auto;
+  max-width: 50%;
 }
 /* media */
 @media screen and (max-width: 425px) {
