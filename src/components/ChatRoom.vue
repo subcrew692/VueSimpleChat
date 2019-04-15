@@ -104,8 +104,8 @@
         </header>
         <div class="modal__body">
           <!-- 註解：使用@keydown.enter來偵測keydown enter，觸發時執行method中的saveName() -->
-          <input type="text" id="js-userName" class="userName" maxlength="10" @keydown.enter="saveName()" :value="userName" /><br/>
-          <div class="button setName" @click="saveName()">設定</div>
+          <input type="text" id="js-userName" class="userName" maxlength="10" @keydown.enter="saveName(null)" :value="userName" /><br/>
+          <div class="button setName" @click="saveName(null)">設定</div>
         </div>
         <footer class="modal__footer"></footer>
       </div>
@@ -182,9 +182,15 @@ export default {
       vm.userNameSet = true;
     },
     /** 儲存設定名稱 */
-    saveName() {
+    saveName(cookieName) {
       const vm = this;
-      const userName = document.querySelector('#js-userName').value;
+      let userName = '';
+      if(cookieName !== null) {
+        userName = cookieName;
+      }else {
+        userName = document.querySelector('#js-userName').value;
+        vm.setCookie('name', userName, 30);
+      }
       if(userName.trim() == '') { return; }
       vm.userName = userName;
       vm.userNameSet = false;
@@ -193,7 +199,7 @@ export default {
     /** 取得user大頭貼 */
     getUserHeadPicture() {
       const vm = this;
-      const userName = document.querySelector('#js-userName').value;
+      const userName = vm.userName;
       // 尋找此user的大頭貼照片
       userFileRef.on('value', function(snapshot) {
         const val = snapshot.val();
@@ -385,6 +391,28 @@ export default {
     },
     downloadImage() {
 
+    },
+    setCookie(cname, cvalue, exdays) {
+      var d = new Date();
+      d.setTime(d.getTime() + (exdays * 1000 * 60 * 60 * 24));
+      var expires = 'expires=' + d.toUTCString();
+      document.cookie = `${cname}=${cvalue};${expires};path/`;
+      console.log(document.cookie);
+    },
+    getCookie(cname) {
+      var name = cname;
+      console.log(document.cookie);
+      var ca = document.cookie.split(';');
+      for(var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while(c.charAt(0) === ' ') {
+          c = c.substring(1);
+        }
+        if(c.indexOf(name) === 0) {
+          return c.substring(name.length + 1, c.length);
+        }
+      }
+      return '';
     }
   },
   // mounted是vue的生命週期之一，代表模板已編譯完成，已經取值準備渲染HTML畫面了
@@ -402,6 +430,11 @@ export default {
       const val = snapshot.val();
       if(val !== null && val !== undefined) {
         vm.userList = val;
+        // 因為同步關係，所以放在裡面做，才會先取得user file(取得user大頭貼)再儲存名字
+        let cookie = vm.getCookie('name');
+        if(cookie !== '') {
+          vm.saveName(cookie);
+        }
       }
     });
   },
