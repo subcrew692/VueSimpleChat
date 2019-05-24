@@ -1,5 +1,5 @@
 <template>
-  <b-container class="col-4 col-xs-4">
+  <b-container class="col-xs-4 col-md-4">
     <h2><b-badge variant="success">Login</b-badge></h2>
 
     <!-- Using components -->
@@ -15,11 +15,11 @@
     </b-input-group>
     
     <b-row class="mt-3">
-    <b-input-group class="col-8 col-xs-8">
+    <b-input-group class="col-xs-8 col-md-8">
       <b-button variant="info" @click="login()">登入</b-button>
     </b-input-group>
 
-    <b-input-group class="col-4 col-xs-4">
+    <b-input-group class="col-xs-4 col-md-4">
       <router-link to="/register">註冊</router-link>
     </b-input-group>
     </b-row>
