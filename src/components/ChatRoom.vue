@@ -1,22 +1,25 @@
 <template>
-<b-container class="col-5" style="font-family: courier new;">
+<b-container class="col-md-5" style="font-family: courier new;">
+  <!-- Modal message -->
+  <loading loader="bars" 
+      :active.sync="isLoading" 
+      :can-cancel="true" 
+      :is-full-page="false"></loading>
     <b-card :img-src="userPic" img-width="70" img-height="70" img-alt="Card image" img-right class="cardWithoutBorder mb-3">
-      <b-card-text class="text-left">Welcome to ChatRoom! {{userName}}</b-card-text>
+      <b-card-text class="text-left">Welcome to {{groupName}}! {{userName}}</b-card-text>
     </b-card>
     <!-- Room Head -->
     <b-card class="roomHeadView">
         <b-media>
-        <b-img slot="aside" alt="placeholder"
-        src="https://github.com/subcrew692/VueSimpleChat/blob/master/src/assets/user.png?raw=true" 
+        <b-img slot="aside" alt="placeholder" v-if="groupImage !== ''"
+        :src="groupImage" 
         width="50" height="50"></b-img>
 
-        <h5 class="mt-0" slot="aside">Test Room</h5>
+        <h5 class="mt-0" slot="aside">{{groupName}}</h5>
         <div style="text-align:right">
             <b-dropdown id="dropdown-right" right text="Setting" variant="primary" class="m-2">
-                <b-dropdown-item href="#" @click="viewHeadPicture()">檢視大頭貼</b-dropdown-item>
-                <b-dropdown-item href="#">更新大頭貼</b-dropdown-item>
-                <b-dropdown-item href="#" @click="changeCrewName()">變更群組名稱</b-dropdown-item>
-                <b-dropdown-item href="#">變更群組圖像</b-dropdown-item>
+                <b-dropdown-item href="#" @click="viewHeadPicture();isChangeHeadPic=true">大頭貼檢視/更新</b-dropdown-item>
+                <b-dropdown-item href="#" @click="modifyGroupModal=true;">編輯群組</b-dropdown-item>
                 <b-dropdown-item href="#" @click="logOut()">登出</b-dropdown-item>
             </b-dropdown>
         </div>
@@ -39,7 +42,7 @@
                           <div class="messageBox__text">{{item.message}}</div>
                       </div>
                       <div v-if="item.type == 'image'" class="messageBox__image"
-                      @click="clickImageMessage(item.id);"><img :src="item.message"></div>
+                      @click="clickImageMessage(item.id);isChangeHeadPic=false;"><img :src="item.message"></div>
                           <div class="messageBox__delete">
                       </div>
                   </div>
@@ -59,7 +62,7 @@
                             <div class="messageBox__text" :id="item.id">{{item.message}}</div>
                         </div>
                         <div v-if="item.type == 'image'" class="messageBox__image"
-                        @click="clickImageMessage(item.id);"><img :src="item.message"></div>
+                        @click="clickImageMessage(item.id);isChangeHeadPic=false;"><img :src="item.message"></div>
                     </div>
                     <div class="messageBox__delete">
                         <span @click="deleteMessage(hoverMessageId)"
@@ -87,12 +90,6 @@
           </label>
           <input type="file" id="file-upload" accept="image/*" @change="sendImage($event, true)" />
           </div>
-          <!-- 
-          <div class="roomBottom__tools_upload">
-            <input type="file" accept="image/*" @change="sendImage($event, true)">
-            <img src="../assets/paperclip.png" title="傳送檔案">&nbsp;
-          </div>
-           -->
         </b-card-header>
         <div class="roomBottom__input">
           <!-- 若要再帶入原生js的event(e)到function中，必須使用$event當參數傳入 -->
@@ -106,7 +103,9 @@
         <img :src="viewImage" style="max-width:750px;">
       </template>
       <template slot="modal-footer" slot-scope="{ ok }">
-        <b-button size="sm" :href="viewImage" download="vueSimpleChatDownload">Download</b-button>
+        <input type="file" id="headPicInput" accept="image/*" @change="sendImage($event, false)">
+        <b-button size="sm" variant="success" @click="changeHeadPic()" v-if="isChangeHeadPic">更換</b-button>
+        <b-button size="sm" :href="viewImage" download="vueSimpleChatDownload">下載</b-button>
         <b-button size="sm" variant="primary" @click="ok()">OK</b-button>
       </template>
     </b-modal>
@@ -114,6 +113,40 @@
     <b-modal v-model="viewOtherUserModal" :title="viewOtherUserModalTitle" hide-footer>
       <img :src="viewOtherUserHeadPicture" class="view-other-user-picture">
     </b-modal>
+    
+    <!-- Modify group name-->
+    <b-modal v-model="modifyGroupModal" title="編輯群組">
+      <span style="color:red;">{{modifyGroupNameMsg}}</span>
+      <b-input-group prepend="名稱" class="mt-3">
+        <b-form-input type="text" v-model="modifyGroupName"></b-form-input>
+        <!--
+        <b-input-group-append>
+          <b-button variant="primary">確認修改</b-button>
+        </b-input-group-append>
+        -->
+      </b-input-group>
+
+      <b-input-group class="mt-3">
+        <!-- Styled -->
+        <b-form-file
+          v-model="modifyGroupImage"
+          :state="Boolean(modifyGroupImage)"
+          placeholder="請點擊上傳圖片..."
+          drop-placeholder="將圖片拉至此處..."
+          accept="image/*"
+          browse-text="瀏覽"
+          @change="uploadGroupImage($event)"
+        ></b-form-file>
+      </b-input-group>
+      <hr>
+      <img :src="previewGroupImageSrc" style="max-width:400px;" />
+
+      <template slot="modal-footer" slot-scope="{ ok }">
+        <b-button size="sm" @click="ok()">取消</b-button>
+        <b-button size="sm" variant="primary" @click="confirmGroupNameModify()">確認</b-button>
+      </template>
+    </b-modal>
+
 </b-container>
 </template>
 
@@ -123,20 +156,29 @@ const msgRef = firebase.database().ref('/messages/');
 const userRef = firebase.storage().ref('/users/');
 const userFileRef = firebase.database().ref('/userProfile/');
 const storageRef = firebase.storage().ref('/images/');
+const groupRef = firebase.database().ref('/groupInfo/');
+const groupImgRef = firebase.storage().ref('/groupImages/');
+import VueLoading from 'vue-loading-overlay';
+import 'vue-loading-overlay/dist/vue-loading.css';
 
 export default {
   // 指定使用此頁的name
   name: 'ChatRoom',
+  components: {
+    loading: VueLoading
+  },
   data() {
     return {
       hoverMessageId: null,
+      groupName: '',
+      groupImage: '',
       userName: '', // 名稱
       messages: [], // 訊息內容
       upload: false, // 上傳進度框
       progress: '', // 上傳進度%數
       currentMsgID: '',
-      messageModalBlock: false,
-      modalMessage: '',
+      isLoading: false,
+      isChangeHeadPic: false, // 是否為大頭貼檢視，控制"更換"button
       userList: null,
       userPic: '',
       viewModal: false, // 檢視Modal
@@ -147,7 +189,13 @@ export default {
       firstOpen: true, // 確認是否為第一次開啟，若為第一次開啟則將聊天拉至最底部(為了避免每點一次訊息就被拉到最底部)
       viewOtherUserModal: false, // Other user modal
       viewOtherUserModalTitle: '', // Other user modal title
-      viewOtherUserHeadPicture: '' // Other user modal head picture
+      viewOtherUserHeadPicture: '', // Other user modal head picture
+      modifyGroupModal: false, // Modify group modal
+      modifyGroupName: '',
+      modifyGroupNameMsg: '',
+      modifyGroupImage: null, // 上傳群組圖片input
+      previewGroupImageSrc: '', // 預覽群組圖片src
+      tempImage: null // 暫存上傳的群組圖片
     }
   },
   methods: {
@@ -232,6 +280,98 @@ export default {
       vm.scrollToBottom();
       e.preventDefault();
     },
+    /** 預覽上傳群組圖片 */
+    uploadGroupImage(e) {
+      const vm = this;
+      vm.tempImage = e.target.files[0];
+      
+      if(vm.tempImage) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          vm.previewGroupImageSrc = e.target.result;
+        }
+        reader.readAsDataURL(vm.tempImage);
+      }
+      
+    },
+    /** 編輯群組Modal */
+    confirmGroupNameModify() {
+      const vm = this;
+      if(vm.modifyGroupName || vm.modifyGroupImage) {
+        // 變更群組名稱
+        if(vm.modifyGroupName) {
+          var uploadGroupNameRef = firebase.database().ref('/groupInfo/Names/');
+          uploadGroupNameRef.push({
+            groupName: vm.modifyGroupName,
+            editer: vm.userName
+          });
+          vm.modifyGroupNameMsg = '';
+          vm.modifyGroupModal = false;
+        }
+
+        // 變更群組圖片
+        if(vm.modifyGroupImage) {
+          var uploadGroupImageRef = firebase.database().ref('/groupInfo/Images/');
+          // 取得上傳的資料
+          const file = vm.tempImage;
+          const fileName = Math.floor(Date.now() / 1000) + `_${file.name}`;
+          const metadata = {
+            contentType: 'image/*'
+          };
+          // 上傳資訊設定
+          const uploadTask = groupImgRef.child(fileName).put(file, metadata);
+          // 上傳狀態處理
+          uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
+            /* 上傳中，打開訊息框 */
+            function(snapshot) {
+              if(snapshot.bytesTransferred < snapshot.totalBytes) {
+                vm.isLoading = true;
+              }
+            },
+            /* 錯誤處理 */
+            function(error) {
+              msgRef.child('bug/').push({
+                userName: vm.userName,
+                type: 'image',
+                message: error.code,
+                timeStamp: vm.getTime()
+              })
+            },
+            /* 上傳結束處理 */
+            function() {
+              var downloadURL = '';
+              var now = new Date();
+              uploadTask.snapshot.ref.getDownloadURL().then(function(url) {
+                console.log("Group image file available at", url);
+                downloadURL = url;
+                uploadGroupImageRef.push({
+                  editer: vm.userName,
+                  type: 'image',
+                  pictureURL: downloadURL,
+                  timeStamp: now
+                });
+
+                vm.isLoading = false;
+              });
+            }
+          )
+        }
+        // 重置編輯群組Modal
+        vm.modifyGroupModal = false;
+        vm.modifyGroupName = '';
+        vm.modifyGroupNameMsg = '';
+        vm.modifyGroupImage = null;
+        vm.previewGroupImageSrc = '';
+      }else {
+        vm.modifyGroupNameMsg = '若要修改，名稱或圖片不得為空';
+      }
+    },
+    /** 更換大頭貼 */
+    changeHeadPic() {
+      const vm = this;
+      let inputFile = document.getElementById("headPicInput");
+      inputFile.click();
+    },
     /** 傳送圖片 */
     sendImage(e, isMessage) {
       console.log(e);
@@ -286,19 +426,18 @@ export default {
             });
             // 關閉進度條
             vm.upload = false;
+            vm.scrollToBottom();
           }
         )
-        vm.scrollToBottom();
       }else {
         var uploadUserFileRef = firebase.database().ref('/userProfile/' + userName + '/');
+        vm.viewModal = false;
         // 上傳狀態處理
         userTask.on(firebase.storage.TaskEvent.STATE_CHANGED, 
           /* 上傳中，打開訊息框 */
           function(snapshot) {
             if(snapshot.bytesTransferred < snapshot.totalBytes) {
-              vm.changeHeadPicModal = false;
-              vm.messageModalBlock = true;
-              vm.modalMessage = '大頭貼上傳中...';
+              vm.isLoading = true;
             }
           },
           /* 錯誤處理 */
@@ -322,15 +461,13 @@ export default {
                 type: 'image',
                 pictureURL: downloadURL,
                 timeStamp: now
-              })
-              // 關閉訊息框並重置訊息
-              vm.messageModalBlock = false;
-              vm.modalMessage = '';
+              });
+
+              vm.isLoading = false;
               vm.getUserHeadPicture();
             });
           }
         )
-        vm.scrollToBottom();
       }
     },
     /** 刪除訊息 */
@@ -348,8 +485,7 @@ export default {
     /** 檢視大頭貼 */
     viewHeadPicture() {
       this.viewImage = this.userPic; // 將大頭貼src帶入到預覽圖片src
-      this.viewImageTitle = '大頭貼檢視'; 
-      // this.changeHeadPicModal = false; // 關閉大頭貼調整Modal
+      this.viewImageTitle = '大頭貼檢視';
       // this.viewModal = true; // 開啟預覽Modal
       if(this.selectOtherUser !== '') { // 若有值，代表選擇其他User
         console.log(this.selectOtherUser);
@@ -381,9 +517,6 @@ export default {
       vm.viewOtherUserModalTitle = item.userName;
       vm.viewOtherUserHeadPicture = item.headPicture;
       vm.viewOtherUserModal = true;
-    },
-    downloadImage() {
-
     },
     getCookie(cname) {
       var name = cname;
@@ -429,7 +562,7 @@ export default {
         ? Object.keys(val).map(key => ({ id: key, ...val[key] }))
         : null
       vm.messages = messageData;
-    })
+    });
     // 尋找此user的大頭貼照片
     userFileRef.on('value', function(snapshot) {
       const val = snapshot.val();
@@ -443,6 +576,19 @@ export default {
           vm.$router.push('/');
         }
       }
+    });
+    groupRef.on('value', function(snapshot) {
+      const val = snapshot.val();
+      const groupNameList = val.Names
+        ? Object.keys(val.Names).map(key => ({ id: key, ...val.Names[key] }))
+        : null;
+      
+      const groupImageList = val.Images
+        ? Object.keys(val.Images).map(key => ({ id: key, ...val.Images[key] }))
+        : null;
+      
+      vm.groupName = groupNameList[groupNameList.length-1].groupName; // 只取最後一筆最新的
+      vm.groupImage = groupImageList[groupImageList.length-1].pictureURL; // 只取最後一筆最新的
     });
   },
   // update是vue的生命週期之一，接在munted後方代表HTML元件渲染完成後
@@ -669,4 +815,5 @@ input[type="file"] {
 .messageBox--self .messageBox__time {
   margin: 0px -16px 5px 0px;
 }
+
 </style>
