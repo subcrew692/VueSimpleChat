@@ -100,7 +100,7 @@
     <!-- 檢視圖片 -->
     <b-modal v-model="viewModal" :title="viewImageTitle" size="lg">
       <template slot="default">
-        <img :src="viewImage" style="max-width:750px;">
+        <img :src="viewImage" style="max-width:100%;">
       </template>
       <template slot="modal-footer" slot-scope="{ ok }">
         <input type="file" id="headPicInput" accept="image/*" @change="sendImage($event, false)">
