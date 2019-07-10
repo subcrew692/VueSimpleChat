@@ -13,16 +13,20 @@
         <b-button variant="outline-primary"><i class="fa fa-eye"></i></b-button>
       </b-input-group-append>   
     </b-input-group>
-    
-    <b-row class="mt-3">
-    <b-input-group class="col-md-8">
-      <b-button variant="info" @click="login()">登入</b-button>
-    </b-input-group>
+    <hr>
+    <table width="100%">
+      <tbody>
+        <tr>
+          <td style="width:50%;text-align:left;">
+            <b-button variant="info" size="sm" @click="login()">登入</b-button>
+          </td>
+          <td style="width:50%;text-align:right;">
+            <router-link to="/register" class="btn btn-outline-primary btn-sm">註冊</router-link>
+          </td>
+        </tr>
+      </tbody>
+    </table>
 
-    <b-input-group class="col-md-4">
-      <router-link to="/register">註冊</router-link>
-    </b-input-group>
-    </b-row>
     <b-modal ref="msgModal" title="Infomation" ok-only>
         {{message}}
     </b-modal>

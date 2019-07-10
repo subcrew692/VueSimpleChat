@@ -1,5 +1,5 @@
 <template>
-  <b-container class="col-4">
+  <b-container class="col-md-4">
     <h2><b-badge variant="success">Register</b-badge></h2>
     <b-form>
         <div style="text-align:left;">
@@ -15,14 +15,26 @@
             <b-input v-model.trim="email" type="email" :state="emailPass" @change="validationEmail()"
             placeholder="請輸入Email..." class="mb-3"></b-input>
 
-            <div style="text-align:right;">
-                <router-link to="/">回登入頁面</router-link>
-                <button class="btn btn-primary btn-sm" @click="register()">註冊</button>
-            </div>
+            <table width="100%">
+            <tbody>
+                <tr>
+                <td style="width:50%;text-align:left;">
+                    <router-link to="/" class="btn btn-outline-primary btn-sm"><i class="fa fa-home"></i> 回登入頁面</router-link>
+                </td>
+                <td style="width:50%;text-align:right;">
+                    <button class="btn btn-success btn-sm" @click="register()">註冊</button>
+                </td>
+                </tr>
+            </tbody>
+            </table>
         </div>
     </b-form>
-    <b-modal ref="msgModal" title="Infomation" ok-only>
+    
+    <b-modal ref="msgModal" title="Infomation">
         {{message}}
+        <template slot="modal-footer">
+            <b-button size="sm" variant="primary" @click="modalOKButton()">OK</b-button>
+        </template>
     </b-modal>
   </b-container>
 </template>
@@ -45,18 +57,30 @@ export default {
         passwordPass: '',
         emailPass: '',
         allUserList: [],
-        message: ''
+        message: '',
+        time: null,
+        registerSuccess: false,
     }
   },
   methods: {
     validationUsername() {
-        this.usernamePass = this.username.length > 3 && this.username.length < 15;
+        this.usernamePass = this.username.length >= 5 && this.username.length < 15;
     },
     validationPassword() {
-        this.passwordPass = this.password.length > 3 && this.password.length < 15;
+        this.passwordPass = this.password.length >= 6 && this.password.length < 20;
     },
     validationEmail() {
-        this.emailPass = this.email.length > 5;
+        var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        this.emailPass = re.test(this.email);
+    },
+    modalOKButton() {
+        if(this.registerSuccess) {
+            clearInterval(this.time);
+            this.$refs['msgModal'].hide();
+            this.$router.push('/');
+        }else {
+            this.$refs['msgModal'].hide();
+        }
     },
     register() {
         const vm = this;
@@ -70,11 +94,18 @@ export default {
                 email: email,
                 timeStamp: new Date().yyyymmddByDash()
             }).then(() => {
-                this.message = '註冊成功!';
+                this.registerSuccess = true;
+                this.message = '註冊成功!請點擊OK或稍後將自動跳轉至首頁......';
                 this.$refs['msgModal'].show();
-                vm.$router.push('/');
+                this.time = setInterval(() => {
+                    clearInterval(this.time);
+                    this.$refs['msgModal'].hide();
+                    this.registerSuccess = false;
+                    this.$router.push('/');
+                }, 3000);
             }).catch(e => console.log('error'));
         }else {
+            this.registerSuccess = false;
             this.$refs['msgModal'].show();
         }        
     },
