@@ -29,7 +29,9 @@
     <!-- Room Body -->
     <b-card id="js-roomBody" class="roomBodyView">
         <!-- 註解：使用template來當迴圈容器，或是判斷用的容器，當條件達成時產出template內容 -->
-        <template v-for="item in messages">
+        <template v-for="(item, index) in messages">
+          <span :style="{'display':dateTimeToText(item.dateTime, index) === '' ? 'none' : 'inline'}"
+          class="dateStyle">{{dateTimeToText(item.dateTime, index)}}</span>
             <!-- other people -->
             <template v-if="item.userName != userName">
                 <b-media-aside>
@@ -119,11 +121,6 @@
       <span style="color:red;">{{modifyGroupNameMsg}}</span>
       <b-input-group prepend="名稱" class="mt-3">
         <b-form-input type="text" v-model="modifyGroupName"></b-form-input>
-        <!--
-        <b-input-group-append>
-          <b-button variant="primary">確認修改</b-button>
-        </b-input-group-append>
-        -->
       </b-input-group>
 
       <b-input-group class="mt-3">
@@ -160,6 +157,17 @@ const groupRef = firebase.database().ref('/groupInfo/');
 const groupImgRef = firebase.storage().ref('/groupImages/');
 import VueLoading from 'vue-loading-overlay';
 import 'vue-loading-overlay/dist/vue-loading.css';
+Date.prototype.yyyyMMddBySlash = function() {
+  var year = this.getFullYear();
+	var month = this.getMonth() + 1 > 9 ? this.getMonth() + 1 : '0' + (this.getMonth() + 1);
+	var date = this.getDate() > 9 ? this.getDate() : '0' + (this.getDate());
+	return year + '/' + month + '/' + date;
+};
+Date.prototype.MMddBySlash = function() {
+	var month = this.getMonth() + 1 > 9 ? this.getMonth() + 1 : '0' + (this.getMonth() + 1);
+	var date = this.getDate() > 9 ? this.getDate() : '0' + (this.getDate());
+	return month + '/' + date;
+};
 
 export default {
   // 指定使用此頁的name
@@ -273,7 +281,8 @@ export default {
         type: 'text',
         message: message.value,
         headPicture: vm.userPic,
-        timeStamp: vm.getTime()
+        timeStamp: vm.getTime(),
+        dateTime: new Date().getTime()
       })
       // 清空輸入欄位避免enter產生的空白換行
       message.value = '';
@@ -303,7 +312,8 @@ export default {
           var uploadGroupNameRef = firebase.database().ref('/groupInfo/Names/');
           uploadGroupNameRef.push({
             groupName: vm.modifyGroupName,
-            editer: vm.userName
+            editer: vm.userName,
+            dateTime: new Date().getTime()
           });
           vm.modifyGroupNameMsg = '';
           vm.modifyGroupModal = false;
@@ -334,7 +344,8 @@ export default {
                 userName: vm.userName,
                 type: 'image',
                 message: error.code,
-                timeStamp: vm.getTime()
+                timeStamp: vm.getTime(),
+                dateTime: new Date().getTime()
               })
             },
             /* 上傳結束處理 */
@@ -348,7 +359,8 @@ export default {
                   editer: vm.userName,
                   type: 'image',
                   pictureURL: downloadURL,
-                  timeStamp: now
+                  timeStamp: now,
+                  dateTime: new Date().getTime()
                 });
 
                 vm.isLoading = false;
@@ -407,7 +419,8 @@ export default {
               userName: userName,
               type: 'image',
               message: error.code,
-              timeStamp: vm.getTime()
+              timeStamp: vm.getTime(),
+              dateTime: new Date().getTime()
             })
           },
           /* 上傳結束處理 */
@@ -421,7 +434,8 @@ export default {
                 type: 'image',
                 message: downloadURL,
                 headPicture: vm.userPic,
-                timeStamp: vm.getTime()
+                timeStamp: vm.getTime(),
+                dateTime: new Date().getTime()
               })
             });
             // 關閉進度條
@@ -446,7 +460,8 @@ export default {
               userName: userName,
               type: 'image',
               message: error.code,
-              timeStamp: vm.getTime()
+              timeStamp: vm.getTime(),
+              dateTime: new Date().getTime()
             })
           },
           /* 上傳結束處理 */
@@ -460,7 +475,8 @@ export default {
                 userName: userName,
                 type: 'image',
                 pictureURL: downloadURL,
-                timeStamp: now
+                timeStamp: now,
+                dateTime: new Date().getTime()
               });
 
               vm.isLoading = false;
@@ -551,6 +567,35 @@ export default {
     logOut() {
       this.deleteAllCookies();
       this.$router.push('/');
+    },
+    dateTimeToText(dateTime, currentIndex) {
+      var today = new Date(dateTime);
+      var yesterday = null;
+      var showDay = null;
+
+      
+      if(currentIndex > 0) {
+        yesterday = new Date(this.messages[currentIndex - 1].dateTime);
+        // 和上則訊息的日期比較，若同天則不再show
+        if(yesterday.yyyyMMddBySlash() !== today.yyyyMMddBySlash()) {
+          showDay = today;
+        }
+      }else {
+        // 若為第一則訊息直接帶入日期
+        showDay = today;
+      }
+      
+      // 若有日期則代表與上則訊息的日期不一樣，需要show
+      if(showDay) {
+        // 若西元年相同，則不show年
+        if(showDay.getFullYear() === new Date().getFullYear()) {
+          return showDay.yyyyMMddBySlash() === new Date().yyyyMMddBySlash() ? '今天' : showDay.MMddBySlash();
+        }else {
+          return showDay.yyyyMMddBySlash();
+        }
+      }else {
+        return '';
+      }
     }
   },
   // mounted是vue的生命週期之一，代表模板已編譯完成，已經取值準備渲染HTML畫面了
@@ -816,4 +861,11 @@ input[type="file"] {
   margin: 0px -16px 5px 0px;
 }
 
+.dateStyle {
+  font-size: 10px;
+  background-color: lightblue;
+  border-radius: 50%;
+  padding: 5px;
+  font-weight: bold;
+}
 </style>
