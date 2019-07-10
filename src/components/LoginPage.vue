@@ -8,9 +8,10 @@
     </b-input-group>
     
     <b-input-group prepend="Password" class="mt-3">
-      <b-form-input type="password" v-model="password"></b-form-input>
+      <b-form-input type="password" v-model="password" v-if="!passwordShow"></b-form-input>
+      <b-form-input type="text" v-model="password" v-if="passwordShow"></b-form-input>
       <b-input-group-append>
-        <b-button variant="outline-primary"><i class="fa fa-eye"></i></b-button>
+        <b-button variant="outline-primary" @click="passwordShow = !passwordShow"><i class="fa fa-eye"></i></b-button>
       </b-input-group-append>   
     </b-input-group>
     <hr>
@@ -42,7 +43,8 @@ export default {
       password: '',
       loginSuccess: false,
       allUserList: [],
-      message: ''
+      message: '',
+      passwordShow: false
     }
   },
   methods: {
